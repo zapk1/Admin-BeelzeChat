@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BeelzeChat — Owner Panel</title>
+    <link rel="icon" href="https://i.postimg.cc/mD0dbHM0/1000287857.png" type="image/png">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            min-height: 100vh;
+        }
+
+        /* ===== GATE SCREEN ===== */
+        #gateScreen {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #ffffff;
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px 16px;
+        }
+        .gate-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.10);
+            width: 100%; max-width: 380px;
+            padding: 36px 28px;
+            text-align: center;
+        }
+        .gate-logo { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 14px; display: block; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+        .gate-title { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+        .gate-sub { color: #64748b; font-size: 13px; margin-top: 6px; font-weight: 600; }
+        .gate-input-wrap { position: relative; margin: 26px 0 14px; }
+        .gate-input {
+            width: 100%; padding: 13px 46px 13px 16px;
+            border: 1px solid #d1d1d1; border-radius: 10px;
+            font-size: 15px; background: #fff; color: #0f172a;
+            outline: none; text-align: center; letter-spacing: 3px;
+        }
+        .gate-input:focus { border-color: #0f172a; }
+        .eye-btn {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; padding: 4px;
+            display: flex; align-items: center;
+        }
+        .gate-error {
+            display: none; background: #fef2f2; color: #dc2626;
+            padding: 10px 14px; border-radius: 10px; font-size: 13px;
+            border: 1px solid #fecaca; margin-bottom: 12px; font-weight: 600;
+        }
+        .gate-error.show { display: block; }
+
+        /* ===== BUTTONS (black & white, 1px edges) ===== */
+        .btn {
+            width: 100%; padding: 14px; border-radius: 10px;
+            font-size: 15px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: all 0.15s;
+        }
+        .btn-black { background: #000; color: #fff; border: 1px solid #000; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+        .btn-black:hover { transform: translateY(-1px); }
+        .btn-white { background: #fff; color: #0f172a; border: 1px solid #d1d1d1; }
+        .btn-white:hover { background: #f1f5f9; }
+
+        .icon-btn {
+            width: 42px; height: 42px; border-radius: 50%;
+            border: 1px solid #e2e8f0; background: #fff;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: all 0.15s;
+        }
+        .icon-btn:hover { background: #f1f5f9; }
+        .icon-btn i { width: 20px; height: 20px; color: #0f172a; }
+        .icon-btn.danger i { color: #dc2626; }
+
+        /* ===== PANEL ===== */
+        #ownerPanel { display: none; max-width: 520px; margin: 0 auto; padding: 16px 14px 60px; }
+        #ownerPanel.active { display: block; }
+
+        .panel-header {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+            padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .panel-brand { display: flex; align-items: center; gap: 10px; }
+        .panel-brand img { width: 38px; height: 38px; border-radius: 10px; }
+        .panel-brand-title { font-size: 18px; font-weight: 900; }
+        .panel-brand-sub { font-size: 11px; color: #64748b; font-weight: 600; }
+        .panel-actions { display: flex; gap: 8px; }
+
+        .section-card {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+            padding: 16px; margin-top: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .section-title { font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .section-title i { width: 18px; height: 18px; }
+
+        .form-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .field { width: 100%; padding: 12px 14px; border: 1px solid #d1d1d1; border-radius: 10px; font-size: 15px; background: #fff; color: #0f172a; outline: none; margin-bottom: 12px; }
+        .field:focus { border-color: #0f172a; }
+        .field-readonly { background: #f8fafc; color: #64748b; }
+
+        .msg-box { display: none; padding: 12px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; margin-top: 4px; }
+        .msg-box.show { display: block; }
+        .msg-error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .msg-success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+        /* accounts list */
+        .search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .search-wrap { position: relative; flex: 1; }
+        .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: #94a3b8; }
+        .search-input { width: 100%; padding: 11px 12px 11px 38px; border: 1px solid #d1d1d1; border-radius: 10px; font-size: 14px; outline: none; }
+        .search-input:focus { border-color: #0f172a; }
+
+        .acct-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 8px;
+        }
+        .acct-avatar {
+            width: 44px; height: 44px; border-radius: 50%; overflow: hidden;
+            background: #000; color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 17px; flex-shrink: 0;
+        }
+        .acct-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .acct-info { flex: 1; min-width: 0; }
+        .acct-name { font-weight: 700; font-size: 14px; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .acct-email { font-size: 12px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .acct-badge { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 20px; border: 1px solid #e2e8f0; color: #64748b; background: #f8fafc; }
+        .edit-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid #e2e8f0; background: #fff; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .edit-btn:hover { background: #f1f5f9; }
+        .edit-btn i { width: 16px; height: 16px; color: #0f172a; }
+
+        /* edit modal — same look as the app's profile edit */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 99999;
+            background: rgba(0,0,0,0.7); align-items: center; justify-content: center; padding: 16px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #fff; border-radius: 24px; width: 100%; max-width: 380px;
+            max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .modal-head { position: relative; padding: 26px 24px 6px; text-align: center; }
+        .modal-close {
+            position: absolute; top: 16px; right: 16px;
+            width: 34px; height: 34px; border-radius: 50%;
+            border: 1px solid #e2e8f0; background: #fff; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-close i { width: 18px; height: 18px; color: #0f172a; }
+        .modal-heading { font-weight: 900; font-size: 20px; color: #0f172a; }
+        .modal-sub { color: #64748b; font-size: 13px; margin-top: 4px; font-weight: 600; }
+        .modal-body { padding: 14px 24px 26px; }
+
+        .edit-avatar {
+            width: 86px; height: 86px; border-radius: 50%; overflow: hidden;
+            background: #000; color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 32px; margin: 0 auto 10px; position: relative;
+        }
+        .edit-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .code-box {
+            background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 12px; text-align: center; margin: 12px 0;
+        }
+        .code-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 4px; }
+        .code-label i { width: 13px; height: 13px; }
+        .code-value { font-weight: 900; font-size: 18px; color: #0f172a; letter-spacing: 2px; }
+
+        /* toast */
+        #toastContainer { position: fixed; top: 14px; left: 0; right: 0; z-index: 100000; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+        .toast {
+            background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15); padding: 12px 16px;
+            display: flex; align-items: center; gap: 10px; min-width: 260px; max-width: 88vw; animation: toastIn 0.3s ease;
+        }
+        @keyframes toastIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .toast-title { font-weight: 800; font-size: 14px; color: #0f172a; }
+        .toast-msg { font-size: 12px; color: #64748b; }
+        .toast i { width: 20px; height: 20px; flex-shrink: 0; }
+        .toast.success i { color: #16a34a; }
+        .toast.error i { color: #dc2626; }
+
+        .hidden { display: none !important; }
+        .muted { color: #94a3b8; font-size: 12px; text-align: center; padding: 16px; }
+    </style>
+</head>
+<body>
+
+<!-- ===== GATE: type VNAXXTTM to enter ===== -->
+<div id="gateScreen">
+    <div class="gate-card">
+        <img src="https://i.postimg.cc/mD0dbHM0/1000287857.png" class="gate-logo" alt="BeelzeChat">
+        <div class="gate-title">BeelzeChat Owner</div>
+        <div class="gate-sub">Owner access only</div>
+        <div class="gate-input-wrap">
+            <input type="password" id="gatePw" class="gate-input" placeholder="Enter password" onkeypress="if(event.key==='Enter')checkGate()">
+            <button type="button" class="eye-btn" onclick="togglePw('gatePw','gateEye')">
+                <i data-lucide="eye" id="gateEye" style="width:20px;height:20px;color:#94a3b8;"></i>
+            </button>
+        </div>
+        <div id="gateError" class="gate-error">Wrong password. Try again.</div>
+        <button class="btn btn-black" onclick="checkGate()">
+            <i data-lucide="lock-open" style="width:20px;height:20px;"></i> Unlock
+        </button>
+    </div>
+</div>
+
+<!-- ===== OWNER PANEL ===== -->
+<div id="ownerPanel">
+
+    <div class="panel-header">
+        <div class="panel-brand">
+            <img src="https://i.postimg.cc/mD0dbHM0/1000287857.png" alt="BeelzeChat">
+            <div>
+                <div class="panel-brand-title">BeelzeChat</div>
+                <div class="panel-brand-sub">Owner Panel</div>
+            </div>
+        </div>
+        <div class="panel-actions">
+            <button class="icon-btn" onclick="toggleCreateForm()" title="Create account">
+                <i data-lucide="user-plus"></i>
+            </button>
+            <button class="icon-btn danger" onclick="lockPanel()" title="Lock">
+                <i data-lucide="lock"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- CREATE ACCOUNT -->
+    <div id="createSection" class="section-card hidden">
+        <div class="section-title"><i data-lucide="user-plus"></i> Create Account</div>
+        <div class="form-label">Full name</div>
+        <input type="text" id="newName" class="field" placeholder="Full name">
+        <div class="form-label">Email</div>
+        <input type="email" id="newEmail" class="field" placeholder="Email">
+        <div class="form-label">Password</div>
+        <div style="position:relative;">
+            <input type="password" id="newPass" class="field" placeholder="Create a password" style="padding-right:46px;">
+            <button type="button" class="eye-btn" onclick="togglePw('newPass','newPassEye')">
+                <i data-lucide="eye" id="newPassEye" style="width:18px;height:18px;color:#94a3b8;"></i>
+            </button>
+        </div>
+        <div class="form-label">Confirm password</div>
+        <input type="password" id="newPassConfirm" class="field" placeholder="Confirm password">
+        <button class="btn btn-black" id="createBtn" onclick="createAccount()">
+            <i data-lucide="user-check" style="width:20px;height:20px;"></i> Create account
+        </button>
+        <div id="createError" class="msg-box msg-error"></div>
+        <div id="createSuccess" class="msg-box msg-success"></div>
+    </div>
+
+    <!-- ACCOUNTS LIST -->
+    <div class="section-card">
+        <div class="section-title"><i data-lucide="users-round"></i> All Accounts</div>
+        <div class="search-row">
+            <div class="search-wrap">
+                <i data-lucide="search"></i>
+                <input type="text" id="acctSearch" class="search-input" placeholder="Search accounts..." oninput="renderAccounts()">
+            </div>
+            <button class="icon-btn" onclick="loadAccounts()" title="Refresh">
+                <i data-lucide="refresh-cw"></i>
+            </button>
+        </div>
+        <div id="acctList"><div class="muted">Loading accounts...</div></div>
+    </div>
+
+</div>
+
+<!-- ===== EDIT ACCOUNT MODAL (same look as the app's profile edit) ===== -->
+<div id="editModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-head">
+            <button class="modal-close" onclick="closeEdit()"><i data-lucide="x"></i></button>
+            <div class="modal-heading">Edit Account</div>
+            <div class="modal-sub">Manage this user</div>
+        </div>
+<div class="modal-body">
+            <input type="file" id="editPicInput" accept="image/*" style="display:none;">
+            <div class="edit-avatar" id="editAvatar" onclick="document.getElementById('editPicInput').click()" style="cursor:pointer;" title="Tap to upload a picture">U</div>
+            <div class="form-label" style="margin-top:10px;">Tap the picture above to upload a new one</div>
+            <div class="form-label">Full name</div>
+            <input type="text" id="editName" class="field" placeholder="Full name">
+            <div class="form-label">Email (cannot be changed)</div>
+            <input type="text" id="editEmail" class="field field-readonly" readonly>
+            <div class="form-label">Bio</div>
+            <input type="text" id="editBio" class="field" placeholder="Bio">
+            <div class="form-label">Password</div>
+            <input type="text" id="editPass" class="field" placeholder="Password">
+            <div class="code-box">
+                <div class="code-label"><i data-lucide="key"></i> Reset Code</div>
+                <input type="text" id="editResetCode" class="field" style="text-align:center;font-weight:900;letter-spacing:2px;font-size:16px;margin-bottom:0;" maxlength="6">
+            </div>
+            <button class="btn btn-black" id="saveBtn" onclick="saveAccount()">
+                <i data-lucide="save" style="width:20px;height:20px;"></i> Save changes
+            </button>
+            <div id="editMsg" class="msg-box msg-error"></div>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+// ============================================================
+// FIREBASE CONFIG — same database as BeelzeChat
+// ============================================================
+const firebaseConfig = {
+    apiKey: 'AIzaSyBfimOu2e0xAMoRyM-rwNMgAk9G_Hgt558',
+    authDomain: 'blackrituals.firebaseapp.com',
+    databaseURL: 'https://blackrituals-default-rtdb.firebaseio.com',
+    projectId: 'blackrituals',
+    storageBucket: 'blackrituals.firebasestorage.app',
+    messagingSenderId: '511685923038',
+    appId: '1:511685923038:web:4db052df64ebb1e194724f',
+    measurementId: 'G-GTD0MXBCEK'
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// ===== Cloudflare R2 Storage — EXACT same bucket as the real BeelzeChat app =====
+const R2_WORKER_URL = 'https://beelzechat-storage-worker.white-mouse-5467.workers.dev';
+const R2_PUBLIC_BUCKET_URL = 'https://pub-730c026431a641358f01194bd545a5f4.r2.dev';
+
+// ===== Compress any image to under 500KB with good quality =====
+async function compressImage(file) {
+    if (!file.type.startsWith('image/')) return file;
+    // Small pictures are uploaded as-is — only big ones get compressed
+    if (file.size <= 500 * 1024) return file;
+    try {
+        const img = await createImageBitmap(file);
+        // Cap the longest side at 1600px first
+        const maxW = 1600;
+        let scale = Math.min(1, maxW / img.width);
+        let w = Math.round(img.width * scale);
+        let h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        // Drop quality until under 500KB
+        let quality = 0.85;
+        let blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+        while (blob.size > 500 * 1024 && quality > 0.4) {
+            quality -= 0.1;
+            blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+        }
+        // Still too big? shrink dimensions too
+        while (blob.size > 500 * 1024 && w > 400) {
+            w = Math.round(w * 0.8); h = Math.round(h * 0.8);
+            const c2 = document.createElement('canvas');
+            c2.width = w; c2.height = h;
+            const cx2 = c2.getContext('2d');
+            cx2.drawImage(img, 0, 0, w, h);
+            blob = await new Promise(r => c2.toBlob(r, 'image/jpeg', quality));
+        }
+        return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    } catch (e) {
+        return file;
+    }
+}
+
+async function uploadToR2(file) {
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(R2_WORKER_URL, { method: 'POST', body: fd });
+        if (!res.ok) { showToast('error', 'Upload Failed', 'Server error ' + res.status); return null; }
+        const data = await res.json();
+        if (data.key) {
+            return R2_PUBLIC_BUCKET_URL.replace(/\/+$/, '') + '/' + data.key;
+        }
+        showToast('error', 'Upload Failed', 'No file key returned');
+        return null;
+    } catch (e) { showToast('error', 'Upload Failed', e.message); return null; }
+}
+
+
+// ============================================================
+// GATE — password is HASHED, never stored as text.
+// (SHA-256 of the owner password; the code only ever sees the hash)
+// ============================================================
+const OWNER_PW_HASH = 'b7597bb5e2797e0276019c97acbf27bbd837cf8b33f95932b6cc742e0ba8eadb';
+
+async function sha256(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function checkGate() {
+    const input = document.getElementById('gatePw').value;
+    const hash = await sha256(input);
+    if (hash === OWNER_PW_HASH) {
+        sessionStorage.setItem('bzOwnerUnlocked', '1');
+        document.getElementById('gateScreen').style.display = 'none';
+        document.getElementById('ownerPanel').classList.add('active');
+        loadAccounts();
+    } else {
+        document.getElementById('gateError').classList.add('show');
+        setTimeout(() => document.getElementById('gateError').classList.remove('show'), 2500);
+    }
+}
+
+function lockPanel() {
+    sessionStorage.removeItem('bzOwnerUnlocked');
+    document.getElementById('ownerPanel').classList.remove('active');
+    document.getElementById('gateScreen').style.display = 'flex';
+    document.getElementById('gatePw').value = '';
+}
+
+// Stay unlocked while the tab is open
+if (sessionStorage.getItem('bzOwnerUnlocked') === '1') {
+    document.getElementById('gateScreen').style.display = 'none';
+    document.getElementById('ownerPanel').classList.add('active');
+    loadAccounts();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function togglePw(inputId, eyeId) {
+    const inp = document.getElementById(inputId);
+    if (inp.type === 'password') inp.type = 'text'; else inp.type = 'password';
+}
+
+function showToast(type, title, msg) {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.innerHTML = '<i data-lucide="' + (type === 'success' ? 'check-circle' : 'alert-circle') + '"></i>' +
+                  '<div><div class="toast-title">' + title + '</div><div class="toast-msg">' + msg + '</div></div>';
+    c.appendChild(t);
+    lucide.createIcons();
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 350); }, 2600);
+}
+
+function toggleCreateForm() {
+    const s = document.getElementById('createSection');
+    s.classList.toggle('hidden');
+    if (!s.classList.contains('hidden')) document.getElementById('newName').focus();
+}
+
+function showBox(id, text) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 6000);
+}
+
+// ============================================================
+// CREATE ACCOUNT — same fields & same Firestore as the real app
+// ============================================================
+async function createAccount() {
+    const name = document.getElementById('newName').value.trim();
+    const identifier = document.getElementById('newEmail').value.trim();
+    const password = document.getElementById('newPass').value;
+    const confirmPassword = document.getElementById('newPassConfirm').value;
+    const btn = document.getElementById('createBtn');
+
+    if (!name || !identifier || !password) { showToast('error', 'Error', 'Fill all fields'); return; }
+    if (!identifier.includes('@')) { showToast('error', 'Invalid', 'Enter a valid email address'); return; }
+    if (password.length < 6) { showToast('error', 'Error', 'Password must be 6+ chars'); return; }
+    if (password !== confirmPassword) { showToast('error', 'Passwords do not match', 'Try again'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" style="width:20px;height:20px;animation:spin 1s linear infinite;"></i> Creating...';
+    lucide.createIcons();
+
+    try {
+        // 1. Firebase Auth account (this is what lets them log into the real app)
+        try { await auth.createUserWithEmailAndPassword(identifier, password); }
+        catch (err) { showToast('error', 'Error', err.message || 'Could not create account'); resetCreateBtn(btn); return; }
+
+        // 2. Firestore user — EXACT same fields as the real app's signup
+        const userId = identifier.replace(/[.#$\[\]@+]/g, '_');
+        const rc = Math.floor(100000 + Math.random() * 900000).toString();
+        const beelzeId = 'BeelzeChatID-' + Math.random().toString(36).substring(2, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
+
+        const ud = await db.collection('users').doc(userId).get();
+        if (ud.exists) { showToast('error', 'Error', 'Account already exists'); resetCreateBtn(btn); return; }
+
+        await db.collection('users').doc(userId).set({
+            name, identifier, password, resetCode: rc,
+            beelzeId,
+            createdAt: Date.now(), online: false,
+            blockedUsers: [], profilePic: null, bio: '',
+            userAgent: navigator.userAgent
+        });
+
+        showToast('success', 'Account created!', identifier);
+        showBox('createSuccess', 'Account created! Reset code: ' + rc + ' — give this code to the user.');
+
+        ['newName', 'newEmail', 'newPass', 'newPassConfirm'].forEach(id => document.getElementById(id).value = '');
+        loadAccounts();
+    } catch (err) {
+        showToast('error', 'Error', err.message || 'Something went wrong');
+    }
+    resetCreateBtn(btn);
+}
+
+function resetCreateBtn(btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="user-check" style="width:20px;height:20px;"></i> Create account';
+    lucide.createIcons();
+}
+
+// ============================================================
+// ACCOUNTS LIST
+// ============================================================
+let allAccounts = [];
+
+async function loadAccounts() {
+    const list = document.getElementById('acctList');
+    list.innerHTML = '<div class="muted">Loading accounts...</div>';
+    try {
+        const snap = await db.collection('users').get();
+        allAccounts = [];
+        snap.forEach(doc => {
+            const d = doc.data();
+            allAccounts.push({ id: doc.id, ...d });
+        });
+        // newest first
+        allAccounts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        renderAccounts();
+        } catch (e) {
+        list.innerHTML = '<div class="muted">Could not load accounts.<br><span style="color:#dc2626;font-weight:700;">' + (e.code || '') + ' ' + (e.message || '') + '</span></div>';
+    }
+}
+
+function renderAccounts() {
+    const q = (document.getElementById('acctSearch').value || '').toLowerCase();
+    const list = document.getElementById('acctList');
+    const filtered = allAccounts.filter(a =>
+        (a.name || '').toLowerCase().includes(q) || (a.identifier || '').toLowerCase().includes(q)
+    );
+    if (!filtered.length) { list.innerHTML = '<div class="muted">No accounts found.</div>'; return; }
+    list.innerHTML = filtered.map(a => {
+        const pic = a.profilePic
+            ? '<img src="' + a.profilePic + '" onerror="this.outerHTML=\'' + ((a.name || 'U').charAt(0).toUpperCase()) + '\'">'
+            : (a.name || 'U').charAt(0).toUpperCase();
+        return '<div class="acct-row">' +
+            '<div class="acct-avatar">' + pic + '</div>' +
+            '<div class="acct-info">' +
+                '<div class="acct-name">' + (a.name || 'No name') + '</div>' +
+                '<div class="acct-email">' + (a.identifier || a.id) + '</div>' +
+            '</div>' +
+            '<span class="acct-badge">' + filtered.length + ' total</span>'.replace(filtered.length + ' total', '') +
+            '<button class="edit-btn" onclick="openEdit(\'' + a.id + '\')" title="Edit"><i data-lucide="pencil"></i></button>' +
+        '</div>';
+    }).join('');
+    lucide.createIcons();
+}
+
+// ============================================================
+// EDIT ACCOUNT — same look as the app's profile edit
+// ============================================================
+let editingId = null;
+
+async function openEdit(userId) {
+    editingId = userId;
+    document.getElementById('editMsg').classList.remove('show');
+    try {
+        const doc = await db.collection('users').doc(userId).get();
+        if (!doc.exists) { showToast('error', 'Error', 'Account not found'); return; }
+        const u = doc.data();
+        document.getElementById('editName').value = u.name || '';
+        document.getElementById('editEmail').value = u.identifier || userId;
+        document.getElementById('editBio').value = u.bio || '';
+        document.getElementById('editPass').value = u.password || '';
+        document.getElementById('editResetCode').value = u.resetCode || '';
+      window._editPicUrl = u.profilePic || '';
+        previewEditAvatar();
+        document.getElementById('editModal').classList.add('active');
+        lucide.createIcons();
+    } catch (e) {
+        showToast('error', 'Error', 'Could not open account');
+    }
+}
+
+function previewEditAvatar() {
+    const url = window._editPicUrl || '';
+    const av = document.getElementById('editAvatar');
+    const initial = (document.getElementById('editName').value || 'U').charAt(0).toUpperCase();
+    const cam = '<div style="position:absolute;bottom:0;right:0;width:28px;height:28px;background:#000;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="camera" style="width:14px;height:14px;color:#fff;"></i></div>';
+    av.innerHTML = (url ? '<img src="' + url + '" onerror="this.outerHTML=\'' + initial + '\'">' : initial) + cam;
+    lucide.createIcons();
+}
+
+function closeEdit() {
+    document.getElementById('editModal').classList.remove('active');
+    editingId = null;
+}
+
+async function saveAccount() {
+    if (!editingId) return;
+    const btn = document.getElementById('saveBtn');
+    const name = document.getElementById('editName').value.trim();
+    const bio = document.getElementById('editBio').value.trim();
+    const password = document.getElementById('editPass').value;
+    const resetCode = document.getElementById('editResetCode').value.trim();
+    const pic = window._editPicUrl || '';
+
+    if (!name) { showToast('error', 'Error', 'Name cannot be empty'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" style="width:20px;height:20px;animation:spin 1s linear infinite;"></i> Saving...';
+    lucide.createIcons();
+    try {
+        await db.collection('users').doc(editingId).update({
+            name, bio, password, resetCode,
+            profilePic: pic || null
+        });
+        showToast('success', 'Saved!', name + ' updated');
+        closeEdit();
+        loadAccounts();
+    } catch (e) {
+        showToast('error', 'Error', e.message || 'Could not save');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="save" style="width:20px;height:20px;"></i> Save changes';
+    lucide.createIcons();
+}
+
+// ===== Upload profile picture — tap avatar, pick photo, progress bar, instant preview =====
+document.getElementById('editPicInput').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Loading overlay with progress bar — same look as the real app
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999999;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;';
+    ov.innerHTML = `<div style="background:white;border-radius:24px;padding:28px 24px;width:280px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+        <img src="https://i.postimg.cc/mD0dbHM0/1000287857.png" style="width:52px;height:52px;border-radius:14px;margin-bottom:12px;">
+        <div style="font-weight:800;font-size:16px;color:#0f172a;margin-bottom:4px;">Uploading Photo</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:16px;">Please wait...</div>
+        <div style="background:#f1f5f9;border-radius:10px;height:10px;overflow:hidden;">
+            <div id="picUploadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#22c55e);border-radius:10px;transition:width 0.3s;"></div>
+        </div>
+        <div id="picUploadPct" style="font-weight:800;color:#3b82f6;margin-top:8px;font-size:14px;">0%</div>
+    </div>`;
+    document.body.appendChild(ov);
+    let fakePct = 0;
+    const fakeIv = setInterval(() => {
+        fakePct += Math.random() * 15;
+        fakePct = Math.min(fakePct, 85);
+        document.getElementById('picUploadBar').style.width = Math.floor(fakePct) + '%';
+        document.getElementById('picUploadPct').textContent = Math.floor(fakePct) + '%';
+    }, 300);
+
+    const compressed = await compressImage(file);
+    const url = await uploadToR2(compressed);
+    clearInterval(fakeIv);
+    if (!url) { ov.remove(); e.target.value = ''; return; }
+
+    document.getElementById('picUploadBar').style.width = '100%';
+    document.getElementById('picUploadPct').textContent = '100%';
+    setTimeout(() => ov.remove(), 600);
+
+    // Instant preview of the uploaded picture
+    window._editPicUrl = url;
+    previewEditAvatar();
+    showToast('success', 'Uploaded!', 'Picture ready — tap Save changes');
+    e.target.value = '';
+});
+
+// Close edit modal when tapping the dark background
+
+document.getElementById('editModal').addEventListener('click', e => {
+    if (e.target.id === 'editModal') closeEdit();
+});
+
+// ============================================================
+// SETUP
+// ============================================================
+document.getElementById('gatePw').focus();
+lucide.createIcons();
+</script>
+</body>
+</html>
