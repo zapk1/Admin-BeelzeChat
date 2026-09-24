@@ -185,6 +185,7 @@
             display: flex; align-items: center; gap: 10px; min-width: 260px; max-width: 88vw; animation: toastIn 0.3s ease;
         }
         @keyframes toastIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .toast-title { font-weight: 800; font-size: 14px; color: #0f172a; }
         .toast-msg { font-size: 12px; color: #64748b; }
         .toast i { width: 20px; height: 20px; flex-shrink: 0; }
@@ -301,8 +302,8 @@
                 <div class="code-label"><i data-lucide="key"></i> Reset Code</div>
                 <input type="text" id="editResetCode" class="field" style="text-align:center;font-weight:900;letter-spacing:2px;font-size:16px;margin-bottom:0;" maxlength="6">
             </div>
-            <button class="btn btn-black" id="saveBtn" onclick="saveAccount()">
-                <i data-lucide="save" style="width:20px;height:20px;"></i> Save changes
+            <button class="btn" id="saveBtn" onclick="saveAccount()" style="background:#fff;color:#7c3aed;border:1px solid #7c3aed;">
+             <i data-lucide="save" style="width:20px;height:20px;"></i> Save changes
             </button>
             <div id="editMsg" class="msg-box msg-error"></div>
         </div>
@@ -546,8 +547,8 @@ function renderAccounts() {
     );
     if (!filtered.length) { list.innerHTML = '<div class="muted">No accounts found.</div>'; return; }
     list.innerHTML = filtered.map(a => {
-        const pic = a.profilePic
-            ? '<img src="' + a.profilePic + '" onerror="this.outerHTML=\'' + ((a.name || 'U').charAt(0).toUpperCase()) + '\'">'
+                const pic = a.profilePic
+            ? '<img src="' + a.profilePic + '" onerror="if(!this.dataset.r){this.dataset.r=1;this.src=this.src;}else{this.outerHTML=\'' + ((a.name || 'U').charAt(0).toUpperCase()) + '\';}">'
             : (a.name || 'U').charAt(0).toUpperCase();
         return '<div class="acct-row">' +
             '<div class="acct-avatar">' + pic + '</div>' +
@@ -570,22 +571,18 @@ let editingId = null;
 async function openEdit(userId) {
     editingId = userId;
     document.getElementById('editMsg').classList.remove('show');
-    try {
-        const doc = await db.collection('users').doc(userId).get();
-        if (!doc.exists) { showToast('error', 'Error', 'Account not found'); return; }
-        const u = doc.data();
-        document.getElementById('editName').value = u.name || '';
-        document.getElementById('editEmail').value = u.identifier || userId;
-        document.getElementById('editBio').value = u.bio || '';
-        document.getElementById('editPass').value = u.password || '';
-        document.getElementById('editResetCode').value = u.resetCode || '';
-      window._editPicUrl = u.profilePic || '';
-        previewEditAvatar();
-        document.getElementById('editModal').classList.add('active');
-        lucide.createIcons();
-    } catch (e) {
-        showToast('error', 'Error', 'Could not open account');
-    }
+    // Use cached data — instant, no Firestore fetch needed
+    const u = allAccounts.find(a => a.id === userId);
+    if (!u) { showToast('error', 'Error', 'Account not found'); return; }
+    document.getElementById('editName').value = u.name || '';
+    document.getElementById('editEmail').value = u.identifier || userId;
+    document.getElementById('editBio').value = u.bio || '';
+    document.getElementById('editPass').value = u.password || '';
+    document.getElementById('editResetCode').value = u.resetCode || '';
+    window._editPicUrl = u.profilePic || '';
+    previewEditAvatar();
+    document.getElementById('editModal').classList.add('active');
+    lucide.createIcons();
 }
 
 function previewEditAvatar() {
@@ -593,7 +590,7 @@ function previewEditAvatar() {
     const av = document.getElementById('editAvatar');
     const initial = (document.getElementById('editName').value || 'U').charAt(0).toUpperCase();
     const cam = '<div style="position:absolute;bottom:0;right:0;width:28px;height:28px;background:#000;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i data-lucide="camera" style="width:14px;height:14px;color:#fff;"></i></div>';
-    av.innerHTML = (url ? '<img src="' + url + '" onerror="this.outerHTML=\'' + initial + '\'">' : initial) + cam;
+    av.innerHTML = (url ? '<img src="' + url + '" onerror="if(!this.dataset.r){this.dataset.r=1;this.src=this.src;}else{this.outerHTML=\'' + initial + '\';}">' : initial) + cam;
     lucide.createIcons();
 }
 
